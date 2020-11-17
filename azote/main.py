@@ -223,18 +223,21 @@ class DisplayBox(Gtk.Box):
     The box contains elements to preview certain displays and assign wallpapers to them
     """
 
-    def __init__(self, name, width, height):
+    def __init__(self, name, width, height, wallpaper_path=None):
         super().__init__()
 
         self.set_orientation(Gtk.Orientation.VERTICAL)
 
         # Values to assigned to corresponding display when apply button pressed
         self.display_name = name
-        self.wallpaper_path = None
-        self.mode = 'fill' if common.sway or common.env['wayland'] else 'scale'
+        self.wallpaper_path = wallpaper_path
+        self.mode = 'fill'
         self.color = None
 
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file('images/empty.png')
+        if wallpaper_path is None:
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file('images/empty.png')
+        else:
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file(wallpaper_path)
         pixbuf = pixbuf.scale_simple(common.settings.thumb_size[0], common.settings.thumb_size[1], InterpType.BILINEAR)
 
         self.img = Gtk.Image.new_from_pixbuf(pixbuf)
@@ -443,10 +446,10 @@ def on_apply_button(button):
         subprocess.call(common.cmd_file, shell=True)
     else:
         # Prepare and execute the feh command. It's being saved automagically to ~/.fehbg
-        mode = common.display_boxes_list[0].mode  # They are all the same, just check the 1st one
-        command = "feh --bg-{}".format(mode)
-        for box in common.display_boxes_list:
-            command += " '{}'".format(box.wallpaper_path)
+        command = ['feh']
+        for i, box in enumerate(common.display_boxes_list):
+            command.append(f'--bg-{box.mode} \'{box.wallpaper_path}\'')
+        command = ' '.join(command)
         subprocess.call(command, shell=True)
 
 
@@ -777,7 +780,7 @@ class GUI:
         common.display_boxes_list = []
         for display in common.displays:
             # Label format: name (width x height)
-            display_box = DisplayBox(display.get('name'), display.get('width'), display.get('height'))
+            display_box = DisplayBox(display.get('name'), display.get('width'), display.get('height'), display.get('wallpaper'))
             common.display_boxes_list.append(display_box)
             displays_box.pack_start(display_box, True, False, 0)
 

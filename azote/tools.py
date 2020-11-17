@@ -11,6 +11,7 @@ Project: https://github.com/nwg-piotr/azote
 License: GPL3
 """
 import os
+import re
 import glob
 import hashlib
 import logging
@@ -175,23 +176,23 @@ def check_displays():
             exit(1)
 
         try:
-            names = subprocess.check_output("xrandr | awk '/ connected/{print $1}'", shell=True).decode(
-                "utf-8").splitlines()
-            res = subprocess.check_output("xrandr | awk '/*/{print $1}'", shell=True).decode("utf-8").splitlines()
-            coords = subprocess.check_output("xrandr --listmonitors | awk '{print $3}'", shell=True).decode(
-                "utf-8").splitlines()
+            list_of_monitors = subprocess.check_output('xrandr --listactivemonitors', shell=True).decode('utf-8').splitlines()[1:]
+            # Replace delimers with spaces
+            tr = str.maketrans({ c: ' ' for c in '\n:+*x/' })
+
+            wallpapers = get_current_wallpapers()
+
             displays = []
-            for i in range(len(res)):
-                w_h = res[i].split('x')
-                try:
-                    x_y = coords[i + 1].split('+')
-                except:
-                    x_y = (0, 0, 0)
-                display = {'name': names[i],
-                           'x': x_y[1],
-                           'y': x_y[2],
-                           'width': int(w_h[0]),
-                           'height': int(w_h[1])}
+            for i, monitor_line in enumerate(list_of_monitors):
+                ml = monitor_line.translate(tr).split()
+                display = {'name': ml[1],
+                           'x': ml[6],
+                           'y': ml[7],
+                           'width': ml[2],
+                           'height': ml[4]}
+                if i < len(wallpapers):
+                    display['wallpaper'] = wallpapers[i]
+
                 displays.append(display)
                 log("Output found: {}".format(display), common.INFO)
             return displays
@@ -200,6 +201,18 @@ def check_displays():
             print("Failed checking displays: {}".format(e), common.ERROR)
             log("Failed checking displays: {}".format(e), common.ERROR)
             exit(1)
+
+
+def get_current_wallpapers():
+    try:
+        with open(f'{os.environ["HOME"]}/.fehbg', 'r') as f:
+            lines = f.readlines()
+            # First line is a shebang
+            cmd = lines[1]
+            wallpaper_names = re.findall(r"\'(\S*)\'", cmd)
+        return wallpaper_names
+    except FileNotFoundError:
+        return []
 
 
 def current_display():
